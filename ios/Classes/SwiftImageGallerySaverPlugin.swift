@@ -6,41 +6,41 @@ public class SwiftImageGallerySaverPlugin: NSObject, FlutterPlugin {
     let errorMessage = "保存失败,请检查权限是否开启"
     
     var result: FlutterResult?;
-
+    
     public static func register(with registrar: FlutterPluginRegistrar) {
-      let channel = FlutterMethodChannel(name: "image_gallery_saver", binaryMessenger: registrar.messenger())
-      let instance = SwiftImageGallerySaverPlugin()
-      registrar.addMethodCallDelegate(instance, channel: channel)
+        let channel = FlutterMethodChannel(name: "image_gallery_saver", binaryMessenger: registrar.messenger())
+        let instance = SwiftImageGallerySaverPlugin()
+        registrar.addMethodCallDelegate(instance, channel: channel)
     }
-
+    
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-      self.result = result
-      if call.method == "saveImageToGallery" {
-        let arguments = call.arguments as? [String: Any] ?? [String: Any]()
-        guard let imageData = (arguments["imageBytes"] as? FlutterStandardTypedData)?.data,
-            let image = UIImage(data: imageData),
-            let quality = arguments["quality"] as? Int,
-            let _ = arguments["name"],
-            let isReturnImagePath = arguments["isReturnImagePathOfIOS"] as? Bool
+        self.result = result
+        if call.method == "saveImageToGallery" {
+            let arguments = call.arguments as? [String: Any] ?? [String: Any]()
+            guard let imageData = (arguments["imageBytes"] as? FlutterStandardTypedData)?.data,
+                  let image = UIImage(data: imageData),
+                  let quality = arguments["quality"] as? Int,
+                  let _ = arguments["name"],
+                  let isReturnImagePath = arguments["isReturnImagePathOfIOS"] as? Bool
             else { return }
-        let newImage = image.jpegData(compressionQuality: CGFloat(quality / 100))!
-        saveImage(UIImage(data: newImage) ?? image, isReturnImagePath: isReturnImagePath)
-      } else if (call.method == "saveFileToGallery") {
-        guard let arguments = call.arguments as? [String: Any],
-              let path = arguments["file"] as? String,
-              let _ = arguments["name"],
-              let isReturnFilePath = arguments["isReturnPathOfIOS"] as? Bool else { return }
-        if (isImageFile(filename: path)) {
-            // saveImageAtFileUrl(path, isReturnImagePath: isReturnFilePath)
-            saveImageWithMetadataAtFileUrl(path, isReturnImagePath: isReturnFilePath)
-        } else {
-            if (UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(path)) {
-                saveVideo(path, isReturnImagePath: isReturnFilePath)
+            let newImage = image.jpegData(compressionQuality: CGFloat(quality / 100))!
+            saveImage(UIImage(data: newImage) ?? image, isReturnImagePath: isReturnImagePath)
+        } else if (call.method == "saveFileToGallery") {
+            guard let arguments = call.arguments as? [String: Any],
+                  let path = arguments["file"] as? String,
+                  let _ = arguments["name"],
+                  let isReturnFilePath = arguments["isReturnPathOfIOS"] as? Bool else { return }
+            if (isImageFile(filename: path)) {
+                // saveImageAtFileUrl(path, isReturnImagePath: isReturnFilePath)
+                saveImageWithMetadataAtFileUrl(path, isReturnImagePath: isReturnFilePath)
+            } else {
+                if (UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(path)) {
+                    saveVideo(path, isReturnImagePath: isReturnFilePath)
+                }
             }
+        } else {
+            result(FlutterMethodNotImplemented)
         }
-      } else {
-        result(FlutterMethodNotImplemented)
-      }
     }
     
     func saveVideo(_ path: String, isReturnImagePath: Bool) {
@@ -153,7 +153,7 @@ public class SwiftImageGallerySaverPlugin: NSObject, FlutterPlugin {
         if let imageSource = CGImageSourceCreateWithURL(fileURL as CFURL, nil) {
             if let metadata = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String:Any] {
                 if let uti = CGImageSourceGetType(imageSource),
-                    let imageDestination = CGImageDestinationCreateWithData(outputData, uti, 1, nil) {
+                   let imageDestination = CGImageDestinationCreateWithData(outputData, uti, 1, nil) {
                     CGImageDestinationAddImageFromSource(imageDestination, imageSource, 0, metadata as NSDictionary)
                     if CGImageDestinationFinalize(imageDestination) {
                         PHPhotoLibrary.shared().performChanges( {
@@ -207,18 +207,21 @@ public class SwiftImageGallerySaverPlugin: NSObject, FlutterPlugin {
         saveResult.filePath = filePath
         result?(saveResult.toDic())
     }
-
+    
     func isImageFile(filename: String) -> Bool {
-        return filename.hasSuffix(".jpg")
-            || filename.hasSuffix(".png")
-            || filename.hasSuffix(".jpeg")
-            || filename.hasSuffix(".JPEG")
-            || filename.hasSuffix(".JPG")
-            || filename.hasSuffix(".PNG")
-            || filename.hasSuffix(".gif")
-            || filename.hasSuffix(".GIF")
-            || filename.hasSuffix(".heic")
-            || filename.hasSuffix(".HEIC")
+        let lcFilename = filename.lowercased()
+        return lcFilename.hasSuffix(".png")
+        || lcFilename.hasSuffix(".jpg")
+        || lcFilename.hasSuffix(".jpeg")
+        || lcFilename.hasSuffix(".gif")
+        || lcFilename.hasSuffix(".heic")
+        || lcFilename.hasSuffix(".tif")
+        || lcFilename.hasSuffix(".tiff")
+        || lcFilename.hasSuffix(".bmp")
+        || lcFilename.hasSuffix(".bmpf")
+        || lcFilename.hasSuffix(".ico")
+        || lcFilename.hasSuffix(".cur")
+        || lcFilename.hasSuffix(".xbm")
     }
 }
 
