@@ -31,7 +31,8 @@ public class SwiftImageGallerySaverPlugin: NSObject, FlutterPlugin {
               let _ = arguments["name"],
               let isReturnFilePath = arguments["isReturnPathOfIOS"] as? Bool else { return }
         if (isImageFile(filename: path)) {
-            saveImageAtFileUrl(path, isReturnImagePath: isReturnFilePath)
+            // saveImageAtFileUrl(path, isReturnImagePath: isReturnFilePath)
+            saveImageWithMetadataAtFileUrl(path, isReturnImagePath: isReturnFilePath)
         } else {
             if (UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(path)) {
                 saveVideo(path, isReturnImagePath: isReturnFilePath)
@@ -143,6 +144,51 @@ public class SwiftImageGallerySaverPlugin: NSObject, FlutterPlugin {
                 }
             }
         })
+    }
+    
+    func saveImageWithMetadataAtFileUrl(_ url: String, isReturnImagePath: Bool) {
+        let fileURL = URL(fileURLWithPath: url, isDirectory: false)
+        var imageIds: [String] = []
+        let outputData = NSMutableData()
+        if let imageSource = CGImageSourceCreateWithURL(fileURL as CFURL, nil) {
+            if let metadata = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String:Any] {
+                if let uti = CGImageSourceGetType(imageSource),
+                    let imageDestination = CGImageDestinationCreateWithData(outputData, uti, 1, nil) {
+                    CGImageDestinationAddImageFromSource(imageDestination, imageSource, 0, metadata as NSDictionary)
+                    if CGImageDestinationFinalize(imageDestination) {
+                        PHPhotoLibrary.shared().performChanges( {
+                            let req = PHAssetCreationRequest.forAsset()
+                            let options = PHAssetResourceCreationOptions();
+                            req.addResource(with: .photo, data: outputData as Data, options: options)
+                            if let imageId = req.placeholderForCreatedAsset?.localIdentifier {
+                                imageIds.append(imageId)
+                            }
+                        }, completionHandler: { [unowned self] (success, error) in
+                            DispatchQueue.main.async {
+                                if (success && imageIds.count > 0) {
+                                    let assetResult = PHAsset.fetchAssets(withLocalIdentifiers: imageIds, options: nil)
+                                    if (assetResult.count > 0) {
+                                        let imageAsset = assetResult[0]
+                                        let options = PHContentEditingInputRequestOptions()
+                                        options.canHandleAdjustmentData = { (adjustmeta)
+                                            -> Bool in true }
+                                        imageAsset.requestContentEditingInput(with: options) { [unowned self] (contentEditingInput, info) in
+                                            if let urlStr = contentEditingInput?.fullSizeImageURL?.absoluteString {
+                                                self.saveResult(isSuccess: true, filePath: urlStr)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    self.saveResult(isSuccess: false, error: self.errorMessage)
+                                }
+                            }
+                        })
+                        return
+                    }
+                }
+            }
+        }
+        saveImageAtFileUrl(url, isReturnImagePath: isReturnImagePath)
     }
     
     /// finish saving，if has error，parameters error will not nill
